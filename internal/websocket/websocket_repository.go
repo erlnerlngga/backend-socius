@@ -78,10 +78,10 @@ func (r *Repository) GetRoom(ctx context.Context, room *RommTypeRes) (*RommTypeR
 }
 
 // Get All Rooms
-func (r *Repository) GetRoomsByUserID(ctx context.Context, user_id, room_id string) ([]*RommTypeRes, error) {
-	query := `select room_id from client where user_id = ? and room_id = ?;`
+func (r *Repository) GetRoomsByUserID(ctx context.Context, user_id string) ([]*RommTypeRes, error) {
+	query := `select room_id from client where user_id = ?;`
 
-	rows, err := r.db.QueryContext(ctx, query, user_id, room_id)
+	rows, err := r.db.QueryContext(ctx, query, user_id)
 
 	if err != nil {
 		return nil, err
@@ -250,13 +250,35 @@ func (r *Repository) CountUnreadMessage(ctx context.Context, user_id string, roo
 		return nil, err
 	}
 
-	countQuery := "select count(*) as `number` from message where created_at >= ? and room_id = ?;"
+	countQuery := "select count(*) as `unread_message` from message where created_at >= ? and room_id = ?;"
 	err = r.db.QueryRowContext(ctx, countQuery, log.Created_At, room.Room_ID).Scan(&room.Unread_Message)
 	if err != nil {
 		return nil, err
 	}
 
 	return room, nil
+}
+
+func (r *Repository) CountAllUnreadMessage(ctx context.Context, user_id, room_id string) (int, error) {
+	log := new(LogType)
+
+	var number int
+
+	query := `select * from log where user_id = ? ans status_log = "leave" order by created_at desc;`
+
+	err := r.db.QueryRowContext(ctx, query, user_id).Scan(&log.Log_ID, &log.Client_ID, &log.User_ID, &log.Status_Log, &log.Created_At)
+
+	if err != nil {
+		return -1, err
+	}
+
+	countQuery := "select count(*) as `unread_message` from message where created_at >= ? and room_id = ?;"
+	err = r.db.QueryRowContext(ctx, countQuery, log.Created_At, room_id).Scan(&number)
+	if err != nil {
+		return -1, err
+	}
+
+	return number, nil
 }
 
 // get all message

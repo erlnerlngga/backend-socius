@@ -79,6 +79,7 @@ type NotificationType struct {
 	Notification_ID string    `json:"notification_id"`
 	Issuer          string    `json:"Issuer"`
 	Notifier        string    `json:"notifier"`
+	Notifier_Name   string    `json:"notifier_name"`
 	Status          string    `json:"status"`
 	Accept          string    `json:"accept"`
 	Post_ID         string    `json:"post_id"`

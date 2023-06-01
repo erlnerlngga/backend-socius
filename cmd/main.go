@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-	log.Println("test")
 
 	db, err := db.NewMysqlStore()
 	if err != nil {

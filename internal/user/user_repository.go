@@ -346,8 +346,8 @@ func (r *Repository) CreateNotification(ctx context.Context, notif *Notification
 	notif.Created_At = time.Now().UTC()
 	notif.Updated_At = time.Now().UTC()
 
-	query := `insert into notification(notification_id, issuer, notifier, status, accept, post_id, type, created_at, updated_at) values(?, ?, ?, ?, ?, ?, ?, ?, ?);`
-	err := r.db.QueryRowContext(ctx, query, notif.Notification_ID, notif.Issuer, notif.Notifier, notif.Status, notif.Accept, notif.Post_ID, notif.Type, notif.Created_At, notif.Updated_At).Scan(&newNotif.Notification_ID, &newNotif.Issuer, &newNotif.Notifier, &newNotif.Status, &newNotif.Accept, &newNotif.Post_ID, &newNotif.Type, &newNotif.Created_At, &newNotif.Updated_At)
+	query := `insert into notification(notification_id, issuer, notifier, notifier_name, status, accept, post_id, type, created_at, updated_at) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`
+	err := r.db.QueryRowContext(ctx, query, notif.Notification_ID, notif.Issuer, notif.Notifier, notif.Notifier_Name, notif.Status, notif.Accept, notif.Post_ID, notif.Type, notif.Created_At, notif.Updated_At).Scan(&newNotif.Notification_ID, &newNotif.Issuer, &newNotif.Notifier, &newNotif.Notifier_Name, &newNotif.Status, &newNotif.Accept, &newNotif.Post_ID, &newNotif.Type, &newNotif.Created_At, &newNotif.Updated_At)
 	if err != nil {
 		return nil, err
 	}

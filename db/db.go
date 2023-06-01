@@ -48,7 +48,7 @@ func (s *MysqlStore) CreateTableUser() error {
 			user_id varchar(100),
 			user_name varchar(100) not null,
 			email varchar(50) not null unique,
-			primary key(id)
+			primary key(user_id)
 		);
 	`
 
@@ -135,6 +135,7 @@ func (s *MysqlStore) CreateNotificationTable() error {
 			notification_id varchar(100),
 			issuer varchar(100) references user(user_id),
 			notifier varchar(100) references user(user_id),
+			notifier_name varchar(100),
 			status varchar(20) not null,
 			accept varchar(20),
 			post_id varchar(100) references post(post_id),
@@ -215,7 +216,7 @@ func (s *MysqlStore) CreateTableLog() error {
 			client_id varchar(100) references client(client_id),
 			user_id varchar(100) references user(user_id),
 			status_log varchar(20) not null,
-			created_at timstamp,
+			created_at timestamp,
 			primary key(log_id)
 		);
 	`

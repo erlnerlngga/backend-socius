@@ -61,13 +61,12 @@ type GetRoomByUserTypeReq struct {
 }
 
 func (h *Handler) GetRoomByUser(w http.ResponseWriter, r *http.Request) error {
-	roomID := chi.URLParam(r, "roomID")
 	userID := chi.URLParam(r, "userID")
 
 	defer r.Body.Close()
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
 	defer cancel()
-	rooms, err := h.hub.Repository.GetRoomsByUserID(ctx, userID, roomID)
+	rooms, err := h.hub.Repository.GetRoomsByUserID(ctx, userID)
 	if err != nil {
 		return err
 	}
@@ -179,4 +178,28 @@ func (h *Handler) GetAllMessage(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	return util.WriteJSON(w, http.StatusOK, message)
+}
+
+func (h *Handler) CountAllUnreadMessage(w http.ResponseWriter, r *http.Request) error {
+	userID := chi.URLParam(r, "userID")
+	result := 0
+
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
+	defer cancel()
+
+	rooms, err := h.hub.GetRoomsByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	for _, val := range rooms {
+		num, err := h.hub.CountAllUnreadMessage(ctx, userID, val.Room_ID)
+		if err != nil {
+			return err
+		}
+
+		result = result + num
+	}
+
+	return util.WriteJSON(w, http.StatusOK, map[string]int{"unread_message": result})
 }

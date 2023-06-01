@@ -58,9 +58,10 @@ func (s *APIServer) Run() {
 	router.Post("/ws/createRoom", util.MakeHTTPHandleFunc(s.wsHandler.CreateRoom))
 	router.Post("/ws/addFriend", util.MakeHTTPHandleFunc(s.wsHandler.AddFriend))
 	router.Get("/ws/joinRoom/{roomID}-{userID}", util.MakeHTTPHandleFunc(s.wsHandler.JoinRoom))
-	router.Get("/ws/getRooms/{roomID}-{userID}", util.MakeHTTPHandleFunc(s.wsHandler.GetRoomByUser))
+	router.Get("/ws/getRoomsByUser/{userID}", util.MakeHTTPHandleFunc(s.wsHandler.GetRoomByUser))
 	router.Get("/ws/getAllMessage/{roomID}", util.MakeHTTPHandleFunc(s.wsHandler.GetAllMessage))
-	router.Delete("ws/remove/{roomID}-{userID}", util.MakeHTTPHandleFunc(s.wsHandler.Remove))
+	router.Get("/ws/getAllUnreadMessage/{userID}", util.MakeHTTPHandleFunc(s.wsHandler.CountAllUnreadMessage))
+	router.Delete("/ws/remove/{roomID}-{userID}", util.MakeHTTPHandleFunc(s.wsHandler.Remove))
 
 	log.Println("server runnng in port: ", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
