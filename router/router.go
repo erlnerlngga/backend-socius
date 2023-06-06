@@ -29,8 +29,6 @@ func NewApiServer(listenAddr string, userHandler *user.Handler, wsHandler *webso
 func (s *APIServer) Run() {
 	router := chi.NewRouter()
 
-	router.Use(middleware.Logger)
-
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:3000"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -38,31 +36,48 @@ func (s *APIServer) Run() {
 		AllowCredentials: true,
 	}))
 
-	router.Post("/checkEmail", util.MakeHTTPHandleFunc(s.userHandler.CheckEmail))
+	router.Group(func(r chi.Router) {
+		r.Get("/ws/joinRoom/{roomID}/{userID}", s.wsHandler.JoinRoom)
+	})
+
 	router.Post("/signup", util.MakeHTTPHandleFunc(s.userHandler.SignUp))
-	router.Post("/addNewFriend", util.MakeHTTPHandleFunc(s.userHandler.AddNewFriend))
-	router.Delete("/removeFriend", util.MakeHTTPHandleFunc(s.userHandler.RemoveFriend))
-	router.Get("/getAllFriend/{userID}", util.MakeHTTPHandleFunc(s.userHandler.GetAllFriend))
-	router.Post("/createPost", util.MakeHTTPHandleFunc(s.userHandler.CreatePost))
-	router.Get("/getAllPost/{userID}", util.MakeHTTPHandleFunc(s.userHandler.GetAllPost))
-	router.Get("/getPost/{postID}", util.MakeHTTPHandleFunc(s.userHandler.GetPost))
-	router.Get("/getAllImage/{userID}", util.MakeHTTPHandleFunc(s.userHandler.GetAllImage))
-	router.Post("/createComment", util.MakeHTTPHandleFunc(s.userHandler.CreateComment))
-	router.Get("/getAllComment/{postID}", util.MakeHTTPHandleFunc(s.userHandler.GetAllComment))
-	router.Post("/createNotification", util.MakeHTTPHandleFunc(s.userHandler.CreateNotification))
-	router.Put("/updateAddFriendNotification", util.MakeHTTPHandleFunc(s.userHandler.UpdateAddFriendNotification))
-	router.Put("/updateNotificationRead/{userID}", util.MakeHTTPHandleFunc(s.userHandler.UpdateNotificationRead))
-	router.Get("/getCountNotification/{userID}", util.MakeHTTPHandleFunc(s.userHandler.GetCountNotification))
-	router.Get("/getAllNotification/{userID}", util.MakeHTTPHandleFunc(s.userHandler.GetAllNotification))
+	router.Post("/signin", util.MakeHTTPHandleFunc(s.userHandler.SignIn))
+	router.Get("/auth/{token}", util.MakeHTTPHandleFunc(s.userHandler.VerifySignIn))
 
-	router.Post("/ws/createRoom", util.MakeHTTPHandleFunc(s.wsHandler.CreateRoom))
-	router.Post("/ws/addFriend", util.MakeHTTPHandleFunc(s.wsHandler.AddFriend))
-	router.Get("/ws/joinRoom/{roomID}-{userID}", util.MakeHTTPHandleFunc(s.wsHandler.JoinRoom))
-	router.Get("/ws/getRoomsByUser/{userID}", util.MakeHTTPHandleFunc(s.wsHandler.GetRoomByUser))
-	router.Get("/ws/getAllMessage/{roomID}", util.MakeHTTPHandleFunc(s.wsHandler.GetAllMessage))
-	router.Get("/ws/getAllUnreadMessage/{userID}", util.MakeHTTPHandleFunc(s.wsHandler.CountAllUnreadMessage))
-	router.Delete("/ws/remove/{roomID}-{userID}", util.MakeHTTPHandleFunc(s.wsHandler.Remove))
+	router.Group(func(r chi.Router) {
+		r.Use(middleware.Logger)
+		r.Use(WithJWTAuth)
+		r.Get("/justCheck/{token}", util.MakeHTTPHandleFunc(s.userHandler.JustCheck))
+		r.Post("/checkEmail", util.MakeHTTPHandleFunc(s.userHandler.CheckEmail))
+		r.Get("/getUser/{userID}", util.MakeHTTPHandleFunc(s.userHandler.GetUserByID))
+		r.Put("/updateUser", util.MakeHTTPHandleFunc(s.userHandler.UpdateUser))
+		r.Get("/getUserbyEmail/{email}", util.MakeHTTPHandleFunc(s.userHandler.GetUserbyEmail))
+		r.Post("/addNewFriend", util.MakeHTTPHandleFunc(s.userHandler.AddNewFriend))
+		r.Delete("/removeFriend/{userID}/{friendID}/{userFriendID}", util.MakeHTTPHandleFunc(s.userHandler.RemoveFriend))
+		r.Get("/getAllFriend/{userID}", util.MakeHTTPHandleFunc(s.userHandler.GetAllFriend))
+		r.Post("/createPost", util.MakeHTTPHandleFunc(s.userHandler.CreatePost))
+		r.Get("/getAllPost/{userID}", util.MakeHTTPHandleFunc(s.userHandler.GetAllPost))
+		r.Get("/getAllOwnPost/{userID}", util.MakeHTTPHandleFunc(s.userHandler.GetAllOwnPost))
+		r.Get("/getPost/{postID}", util.MakeHTTPHandleFunc(s.userHandler.GetPost))
+		r.Get("/getAllImage/{userID}", util.MakeHTTPHandleFunc(s.userHandler.GetAllImage))
+		r.Post("/createComment", util.MakeHTTPHandleFunc(s.userHandler.CreateComment))
+		r.Get("/getAllComment/{postID}", util.MakeHTTPHandleFunc(s.userHandler.GetAllComment))
+		r.Post("/createNotification", util.MakeHTTPHandleFunc(s.userHandler.CreateNotification))
+		r.Put("/updateAddFriendNotification", util.MakeHTTPHandleFunc(s.userHandler.UpdateAddFriendNotification))
+		r.Put("/updateNotificationRead/{userID}", util.MakeHTTPHandleFunc(s.userHandler.UpdateNotificationRead))
+		r.Get("/getCountNotification/{userID}", util.MakeHTTPHandleFunc(s.userHandler.GetCountNotification))
+		r.Get("/getAllNotification/{userID}", util.MakeHTTPHandleFunc(s.userHandler.GetAllNotification))
 
-	log.Println("server runnng in port: ", s.listenAddr)
+		// ws
+		r.Post("/ws/createRoom", util.MakeHTTPHandleFunc(s.wsHandler.CreateRoom))
+		r.Put("/ws/updateRoomName", util.MakeHTTPHandleFunc(s.wsHandler.UpdateRoomName))
+		r.Post("/ws/addFriend", util.MakeHTTPHandleFunc(s.wsHandler.AddFriend))
+		r.Get("/ws/getRoomsByUser/{userID}", util.MakeHTTPHandleFunc(s.wsHandler.GetRoomByUser))
+		r.Get("/ws/getAllMessage/{roomID}", util.MakeHTTPHandleFunc(s.wsHandler.GetAllMessage))
+		r.Get("/ws/getAllUnreadMessage/{userID}", util.MakeHTTPHandleFunc(s.wsHandler.CountAllUnreadMessage))
+		r.Delete("/ws/remove/{roomID}/{userID}", util.MakeHTTPHandleFunc(s.wsHandler.Remove))
+	})
+
+	log.Println("server running in port: ", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
 }

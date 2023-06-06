@@ -1,10 +1,9 @@
 package websocket
 
 import (
-	"context"
 	"encoding/json"
+	"log"
 	"net/http"
-	"time"
 
 	"github.com/erlnerlngga/backend-socius/util"
 	"github.com/go-chi/chi/v5"
@@ -29,30 +28,50 @@ func (h *Handler) CreateRoom(w http.ResponseWriter, r *http.Request) error {
 
 	defer r.Body.Close()
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-
 	rm := &RoomType{
 		Name_Room: newRoom.Name_Room,
 	}
-	room, err := h.hub.Repository.CreateRoom(ctx, rm)
+	newRoomRes, err := h.hub.Repository.CreateRoom(rm)
 	if err != nil {
 		return err
 	}
 
 	cl := &ClientType{
-		Room_ID:   room.Room_ID,
+		Room_ID:   newRoomRes.Room_ID,
 		User_ID:   newRoom.User_ID,
 		User_Name: newRoom.User_Name,
 		Role:      "admin",
 	}
 
-	client, err := h.hub.InsertNewClient(ctx, cl)
+	err = h.hub.InsertNewClient(cl)
 	if err != nil {
 		return err
 	}
 
-	return util.WriteJSON(w, http.StatusOK, client)
+	h.hub.Rooms[newRoomRes.Room_ID] = &Room{
+		Room_ID:   newRoomRes.Room_ID,
+		Room_Name: newRoomRes.Name_Room,
+		Clients:   make(map[string]*Client),
+	}
+
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) UpdateRoomName(w http.ResponseWriter, r *http.Request) error {
+	upRoom := new(RoomType)
+
+	if err := json.NewDecoder(r.Body).Decode(upRoom); err != nil {
+		return err
+	}
+
+	defer r.Body.Close()
+
+	err := h.hub.Repository.UpdateRoomName(upRoom)
+	if err != nil {
+		return err
+	}
+
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 type GetRoomByUserTypeReq struct {
@@ -64,11 +83,22 @@ func (h *Handler) GetRoomByUser(w http.ResponseWriter, r *http.Request) error {
 	userID := chi.URLParam(r, "userID")
 
 	defer r.Body.Close()
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-	rooms, err := h.hub.Repository.GetRoomsByUserID(ctx, userID)
+
+	rooms, err := h.hub.Repository.GetRoomsByUserID(userID)
 	if err != nil {
 		return err
+	}
+
+	for _, val := range rooms {
+		_, ok := h.hub.Rooms[val.Room_ID]
+
+		if !ok {
+			h.hub.Rooms[val.Room_ID] = &Room{
+				Room_ID:   val.Room_ID,
+				Room_Name: val.Name_Room,
+				Clients:   make(map[string]*Client),
+			}
+		}
 	}
 
 	return util.WriteJSON(w, http.StatusOK, rooms)
@@ -85,28 +115,27 @@ func (h *Handler) AddFriend(w http.ResponseWriter, r *http.Request) error {
 
 	friend.Role = "user"
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-	client, err := h.hub.Repository.InsertNewClient(ctx, friend)
+	err := h.hub.Repository.InsertNewClient(friend)
 	if err != nil {
 		return err
 	}
 
-	return util.WriteJSON(w, http.StatusOK, client)
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		origin := r.Header.Get("Origin")
+		return origin == "http://localhost:3000"
 	},
 }
 
-func (h *Handler) JoinRoom(w http.ResponseWriter, r *http.Request) error {
+func (h *Handler) JoinRoom(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		return err
+		log.Panicln("UPGRADER CONNECTION", err)
 	}
 
 	roomID := chi.URLParam(r, "roomID")
@@ -115,11 +144,10 @@ func (h *Handler) JoinRoom(w http.ResponseWriter, r *http.Request) error {
 	var cl *Client
 
 	// check client
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-	res, err := h.hub.Repository.CheckClient(ctx, userID, roomID)
+
+	res, err := h.hub.Repository.CheckClient(userID, roomID)
 	if err != nil {
-		return err
+		log.Panicln("CheckClient Handler", err)
 	}
 
 	cl = &Client{
@@ -135,8 +163,6 @@ func (h *Handler) JoinRoom(w http.ResponseWriter, r *http.Request) error {
 
 	go cl.writeMessage()
 	cl.readMessage(h.hub)
-
-	return nil
 }
 
 func (h *Handler) Remove(w http.ResponseWriter, r *http.Request) error {
@@ -144,23 +170,24 @@ func (h *Handler) Remove(w http.ResponseWriter, r *http.Request) error {
 	roomID := chi.URLParam(r, "roomID")
 
 	// check client
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-	res, err := h.hub.Repository.CheckClient(ctx, userID, roomID)
+
+	res, err := h.hub.Repository.CheckClient(userID, roomID)
 	if err != nil {
 		return err
 	}
 
-	err = h.hub.RemoveClient(ctx, userID, roomID)
+	err = h.hub.RemoveClient(userID, roomID)
 	if err != nil {
 		return err
 	}
 
 	if res.Role == "admin" {
-		err := h.hub.RemoveRoom(ctx, roomID)
+		err := h.hub.RemoveRoom(roomID)
 		if err != nil {
 			return err
 		}
+
+		delete(h.hub.Rooms, roomID)
 	}
 
 	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
@@ -169,10 +196,7 @@ func (h *Handler) Remove(w http.ResponseWriter, r *http.Request) error {
 func (h *Handler) GetAllMessage(w http.ResponseWriter, r *http.Request) error {
 	roomID := chi.URLParam(r, "roomID")
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-
-	message, err := h.hub.GetAllMessage(ctx, roomID)
+	message, err := h.hub.GetAllMessage(roomID)
 	if err != nil {
 		return err
 	}
@@ -184,16 +208,13 @@ func (h *Handler) CountAllUnreadMessage(w http.ResponseWriter, r *http.Request) 
 	userID := chi.URLParam(r, "userID")
 	result := 0
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-
-	rooms, err := h.hub.GetRoomsByUserID(ctx, userID)
+	rooms, err := h.hub.GetRoomsByUserID(userID)
 	if err != nil {
 		return err
 	}
 
 	for _, val := range rooms {
-		num, err := h.hub.CountAllUnreadMessage(ctx, userID, val.Room_ID)
+		num, err := h.hub.CountAllUnreadMessage(userID, val.Room_ID)
 		if err != nil {
 			return err
 		}

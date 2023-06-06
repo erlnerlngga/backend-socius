@@ -1,13 +1,13 @@
 package user
 
 import (
-	"context"
 	"encoding/json"
+	"log"
 	"net/http"
-	"time"
 
 	"github.com/erlnerlngga/backend-socius/util"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 type Handler struct {
@@ -28,9 +28,7 @@ func (h *Handler) CheckEmail(w http.ResponseWriter, r *http.Request) error {
 
 	defer r.Body.Close()
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-	email, err := h.Repository.CheckEmail(ctx, acc.Email)
+	email, err := h.Repository.CheckEmail(acc.Email)
 	if err != nil {
 		return err
 	}
@@ -47,14 +45,159 @@ func (h *Handler) SignUp(w http.ResponseWriter, r *http.Request) error {
 
 	defer r.Body.Close()
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-	newAcc, err := h.Repository.SignUp(ctx, acc)
+	newAcc, err := h.Repository.SignUp(acc)
 	if err != nil {
 		return err
 	}
 
-	return util.WriteJSON(w, http.StatusOK, newAcc)
+	tokenStr, err := util.CreateJWT(newAcc.User_ID)
+	if err != nil {
+		return err
+	}
+
+	if err := util.SendMAIL(newAcc.Email, newAcc.User_Name, tokenStr); err != nil {
+		return err
+	}
+
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+func (h *Handler) SignIn(w http.ResponseWriter, r *http.Request) error {
+	email := new(SignInType)
+
+	if err := json.NewDecoder(r.Body).Decode(email); err != nil {
+		return err
+	}
+
+	defer r.Body.Close()
+
+	account, err := h.Repository.CheckEmail(email.Email)
+	if err != nil {
+		return err
+	}
+
+	// create token
+	tokenStr, err := util.CreateJWT(account.User_ID)
+	if err != nil {
+		return err
+	}
+
+	if err := util.SendMAIL(account.Email, account.User_Name, tokenStr); err != nil {
+		return err
+	}
+
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+func (h *Handler) VerifySignIn(w http.ResponseWriter, r *http.Request) error {
+	tokenStr := chi.URLParam(r, "token")
+
+	claims := new(util.ClaimsType)
+
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+		return util.JwtKey, nil
+	})
+
+	if err != nil {
+		if err == jwt.ErrSignatureInvalid {
+			return util.WriteJSON(w, http.StatusUnauthorized, util.ApiError{Error: "signature invalid"})
+		}
+
+		return util.WriteJSON(w, http.StatusUnauthorized, util.ApiError{Error: err.Error()})
+	}
+
+	if !token.Valid {
+		return util.WriteJSON(w, http.StatusUnauthorized, util.ApiError{Error: "token invalid"})
+	}
+
+	user, err := h.Repository.GetUser(claims.User_ID)
+	if err != nil {
+		return err
+	}
+
+	resultVer := &VerifyResType{
+		Status: "ok",
+		Token:  tokenStr,
+		User:   user,
+	}
+
+	return util.WriteJSON(w, http.StatusOK, resultVer)
+}
+
+func (h *Handler) JustCheck(w http.ResponseWriter, r *http.Request) error {
+	tokenStr := chi.URLParam(r, "token")
+
+	claims := new(util.ClaimsType)
+
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+		return util.JwtKey, nil
+	})
+
+	if err != nil {
+		if err == jwt.ErrSignatureInvalid {
+			return util.WriteJSON(w, http.StatusUnauthorized, util.ApiError{Error: "signature invalid"})
+		}
+
+		return util.WriteJSON(w, http.StatusUnauthorized, util.ApiError{Error: err.Error()})
+	}
+
+	if !token.Valid {
+		return util.WriteJSON(w, http.StatusUnauthorized, util.ApiError{Error: "token invalid"})
+	}
+
+	user, err := h.Repository.GetUser(claims.User_ID)
+	if err != nil {
+		return err
+	}
+
+	resultVer := &VerifyResType{
+		Status: "ok",
+		Token:  tokenStr,
+		User:   user,
+	}
+
+	return util.WriteJSON(w, http.StatusOK, resultVer)
+}
+
+func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) error {
+	userID := chi.URLParam(r, "userID")
+
+	user, err := h.Repository.GetUser(userID)
+	if err != nil {
+		return err
+	}
+
+	return util.WriteJSON(w, http.StatusOK, user)
+}
+
+func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) error {
+	userUp := new(UserType)
+
+	if err := json.NewDecoder(r.Body).Decode(userUp); err != nil {
+		return err
+	}
+
+	defer r.Body.Close()
+
+	log.Println(userUp)
+
+	err := h.Repository.UpdateUser(userUp)
+	if err != nil {
+		return err
+	}
+
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) GetUserbyEmail(w http.ResponseWriter, r *http.Request) error {
+	email := chi.URLParam(r, "email")
+
+	user, err := h.Repository.GetUserbyEmail(email)
+	if err != nil {
+		return err
+	}
+
+	return util.WriteJSON(w, http.StatusOK, user)
 }
 
 func (h *Handler) AddNewFriend(w http.ResponseWriter, r *http.Request) error {
@@ -66,37 +209,40 @@ func (h *Handler) AddNewFriend(w http.ResponseWriter, r *http.Request) error {
 
 	defer r.Body.Close()
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-	fr, err := h.Repository.AddFriend(ctx, newFr)
+	err := h.Repository.AddFriend(newFr)
 	if err != nil {
 		return err
 	}
 
-	return util.WriteJSON(w, http.StatusOK, fr)
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) RemoveFriend(w http.ResponseWriter, r *http.Request) error {
 	userFriendId := chi.URLParam(r, "userFriendID")
+	userID := chi.URLParam(r, "userID")
+	friendID := chi.URLParam(r, "friendID")
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-	err := h.Repository.RemoveFriend(ctx, userFriendId)
+	err := h.Repository.RemoveFriend(userFriendId)
 
 	if err != nil {
 		return err
 	}
 
-	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "succes"})
+	err = h.Repository.RemoveFriendByUserID(friendID, userID)
+
+	if err != nil {
+		return err
+	}
+
+	log.Println("works")
+
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) GetAllFriend(w http.ResponseWriter, r *http.Request) error {
 	userID := chi.URLParam(r, "userID")
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-
-	friends, err := h.Repository.GetAllFriend(ctx, userID)
+	friends, err := h.Repository.GetAllFriend(userID)
 	if err != nil {
 		return err
 	}
@@ -113,15 +259,13 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) error {
 
 	defer r.Body.Close()
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-
 	p := &PostType{
 		User_ID: newPost.User_ID,
 		Content: newPost.Content,
+		Type:    "main",
 	}
 
-	post, err := h.Repository.CreatePost(ctx, p)
+	post_ID, err := h.Repository.CreatePost(p)
 	if err != nil {
 		return err
 	}
@@ -129,12 +273,12 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) error {
 	if len(newPost.Images) > 0 {
 		for _, val := range newPost.Images {
 			im := &Image_PostType{
-				Post_ID: post.Post_ID,
+				Post_ID: post_ID,
 				User_ID: p.User_ID,
 				Image:   val,
 			}
 
-			_, err := h.Repository.CreateImagePost(ctx, im)
+			err := h.Repository.CreateImagePost(im)
 
 			if err != nil {
 				return err
@@ -142,16 +286,37 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	return util.WriteJSON(w, http.StatusOK, post)
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) GetAllPost(w http.ResponseWriter, r *http.Request) error {
 	userID := chi.URLParam(r, "userID")
+	var post []*GetPostResType
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(3)*time.Second)
-	defer cancel()
+	number, err := h.Repository.CheckFriend(userID)
+	if err != nil {
+		return err
+	}
 
-	post, err := h.Repository.GetAllPost(ctx, userID)
+	if number > 0 {
+		post, err = h.Repository.GetAllPost(userID)
+		if err != nil {
+			return err
+		}
+	} else {
+		post, err = h.Repository.GetAllOwnPost(userID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return util.WriteJSON(w, http.StatusOK, post)
+}
+
+func (h *Handler) GetAllOwnPost(w http.ResponseWriter, r *http.Request) error {
+	userID := chi.URLParam(r, "userID")
+
+	post, err := h.Repository.GetAllOwnPost(userID)
 	if err != nil {
 		return err
 	}
@@ -162,10 +327,7 @@ func (h *Handler) GetAllPost(w http.ResponseWriter, r *http.Request) error {
 func (h *Handler) GetPost(w http.ResponseWriter, r *http.Request) error {
 	postID := chi.URLParam(r, "postID")
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-
-	post, err := h.Repository.GetPost(ctx, postID)
+	post, err := h.Repository.GetPost(postID)
 	if err != nil {
 		return err
 	}
@@ -176,10 +338,7 @@ func (h *Handler) GetPost(w http.ResponseWriter, r *http.Request) error {
 func (h *Handler) GetAllImage(w http.ResponseWriter, r *http.Request) error {
 	userID := chi.URLParam(r, "userID")
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-
-	images, err := h.Repository.GetAllImage(ctx, userID)
+	images, err := h.Repository.GetAllImage(userID)
 	if err != nil {
 		return err
 	}
@@ -195,15 +354,14 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	defer r.Body.Close()
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
 
 	p := &PostType{
 		User_ID: newPost.User_ID,
 		Content: newPost.Content,
+		Type:    "child",
 	}
 
-	post, err := h.Repository.CreatePost(ctx, p)
+	post_ID, err := h.Repository.CreatePost(p)
 	if err != nil {
 		return err
 	}
@@ -211,12 +369,12 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) error {
 	if len(newPost.Images) > 0 {
 		for _, val := range newPost.Images {
 			im := &Image_PostType{
-				Post_ID: post.Post_ID,
+				Post_ID: post_ID,
 				User_ID: p.User_ID,
 				Image:   val,
 			}
 
-			_, err := h.Repository.CreateImagePost(ctx, im)
+			err := h.Repository.CreateImagePost(im)
 
 			if err != nil {
 				return err
@@ -226,25 +384,22 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) error {
 
 	commen := &CommentType{
 		Post_ID:         newPost.Post_ID,
-		Comment_Post_ID: post.Post_ID,
+		Comment_Post_ID: post_ID,
 	}
 
 	// insert comment
-	com, err := h.Repository.CreateComment(ctx, commen)
+	err = h.Repository.CreateComment(commen)
 	if err != nil {
 		return err
 	}
 
-	return util.WriteJSON(w, http.StatusOK, com)
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) GetAllComment(w http.ResponseWriter, r *http.Request) error {
 	postID := chi.URLParam(r, "postID")
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-
-	comment, err := h.Repository.GetAllComment(ctx, postID)
+	comment, err := h.Repository.GetAllComment(postID)
 	if err != nil {
 		return err
 	}
@@ -261,16 +416,12 @@ func (h *Handler) CreateNotification(w http.ResponseWriter, r *http.Request) err
 
 	defer r.Body.Close()
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-
-	defer cancel()
-
-	notif, err := h.Repository.CreateNotification(ctx, not)
+	err := h.Repository.CreateNotification(not)
 	if err != nil {
 		return err
 	}
 
-	return util.WriteJSON(w, http.StatusOK, notif)
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) UpdateAddFriendNotification(w http.ResponseWriter, r *http.Request) error {
@@ -282,38 +433,29 @@ func (h *Handler) UpdateAddFriendNotification(w http.ResponseWriter, r *http.Req
 
 	defer r.Body.Close()
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-
-	notif, err := h.Repository.UpdateNotif(ctx, newNotif)
+	err := h.Repository.UpdateNotif(newNotif)
 	if err != nil {
 		return err
 	}
 
-	return util.WriteJSON(w, http.StatusOK, notif)
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) UpdateNotificationRead(w http.ResponseWriter, r *http.Request) error {
 	userID := chi.URLParam(r, "userID")
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-
-	notif, err := h.Repository.UpdatedNotifRead(ctx, userID)
+	err := h.Repository.UpdatedNotifRead(userID)
 	if err != nil {
 		return err
 	}
 
-	return util.WriteJSON(w, http.StatusOK, notif)
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) GetCountNotification(w http.ResponseWriter, r *http.Request) error {
 	userID := chi.URLParam(r, "userID")
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-
-	num, err := h.Repository.GetCountNotif(ctx, userID)
+	num, err := h.Repository.GetCountNotif(userID)
 	if err != nil {
 		return err
 	}
@@ -324,10 +466,7 @@ func (h *Handler) GetCountNotification(w http.ResponseWriter, r *http.Request) e
 func (h *Handler) GetAllNotification(w http.ResponseWriter, r *http.Request) error {
 	userID := chi.URLParam(r, "userID")
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(2)*time.Second)
-	defer cancel()
-
-	notif, err := h.Repository.GetAllNotif(ctx, userID)
+	notif, err := h.Repository.GetAllNotif(userID)
 	if err != nil {
 		return err
 	}

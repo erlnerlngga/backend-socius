@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"context"
+	"log"
 	"time"
 )
 
@@ -32,20 +33,24 @@ func NewHub(repository Repository) *Hub {
 }
 
 func (h *Hub) Run(c context.Context) {
-	ctx, cancel := context.WithTimeout(c, h.timeout)
-	defer cancel()
 
 	for {
 		select {
 		case cl := <-h.Register:
 			// check room
-			room, err := h.Repository.CheckRoom(ctx, cl.Room_ID)
+			_, err := h.Repository.CheckRoom(cl.Room_ID)
 			_, ok := h.Rooms[cl.Room_ID]
+
+			if err != nil {
+				log.Println("1. Register", err)
+			}
+
 			if err == nil && ok {
 				// check is client is not there
-				_, err := h.Repository.CheckClient(ctx, cl.Client_ID, room.Room_ID)
+
 				_, ok := h.Rooms[cl.Room_ID].Clients[cl.Client_ID]
-				if err.Error() == "client_id isn't found" && !ok {
+
+				if !ok {
 
 					log := &LogType{
 						Client_ID:  cl.Client_ID,
@@ -53,38 +58,42 @@ func (h *Hub) Run(c context.Context) {
 						Status_Log: "online",
 					}
 					// add client to that room
-					h.Repository.CreateLog(ctx, log)
+					h.Repository.CreateLog(log)
 					h.Rooms[cl.Room_ID].Clients[cl.Client_ID] = cl
 				}
 			}
 
 		case cl := <-h.Unregister:
-			room, err := h.Repository.CheckRoom(ctx, cl.Room_ID)
 			_, ok := h.Rooms[cl.Room_ID]
 
-			if err == nil && ok {
-				_, err := h.Repository.CheckClient(ctx, cl.Client_ID, room.Room_ID)
+			if ok {
 				_, ok := h.Rooms[cl.Room_ID].Clients[cl.Client_ID]
 
-				if err == nil && ok {
+				if ok {
 					log := &LogType{
 						Client_ID:  cl.Client_ID,
 						User_ID:    cl.User_ID,
 						Status_Log: "leave",
 					}
 
-					h.Repository.CreateLog(ctx, log)
+					h.Repository.CreateLog(log)
 					delete(h.Rooms[cl.Room_ID].Clients, cl.Client_ID)
 					close(cl.Message)
 				}
 			}
 
 		case m := <-h.Broadcast:
-			_, err := h.Repository.CheckRoom(ctx, m.Room_ID)
+			_, err := h.Repository.CheckRoom(m.Room_ID)
 			_, ok := h.Rooms[m.Room_ID]
-
+			if err != nil {
+				log.Println("1. Broadcast", err)
+			}
 			if err == nil && ok {
-				h.Repository.CreateMessage(ctx, m)
+				m, err = h.Repository.CreateMessage(m)
+				if err != nil {
+					log.Println("2. Broadcast", err)
+				}
+
 				for _, cl := range h.Rooms[m.Room_ID].Clients {
 					cl.Message <- m
 				}

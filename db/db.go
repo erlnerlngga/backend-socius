@@ -48,6 +48,7 @@ func (s *MysqlStore) CreateTableUser() error {
 			user_id varchar(100),
 			user_name varchar(100) not null,
 			email varchar(50) not null unique,
+			photo_profile varchar(200),
 			primary key(user_id)
 		);
 	`
@@ -80,6 +81,7 @@ func (s *MysqlStore) CreatePostTable() error {
 			post_id varchar(100),
 			user_id varchar(100) references user(user_id),
 			content varchar(500),
+			type varchar(10),
 			created_at timestamp,
 			updated_at timestamp,
 			primary key(post_id)
@@ -134,6 +136,7 @@ func (s *MysqlStore) CreateNotificationTable() error {
 		create table if not exists notification (
 			notification_id varchar(100),
 			issuer varchar(100) references user(user_id),
+			issuer_name varchar(100),
 			notifier varchar(100) references user(user_id),
 			notifier_name varchar(100),
 			status varchar(20) not null,
@@ -156,7 +159,7 @@ func (s *MysqlStore) CreateTableRoom() error {
 	createTable := `
 		create table if not exists room (
 			room_id varchar(100),
-			romm_name varchar(50) not null,
+			name_room varchar(50) not null,
 			created_at timestamp,
 			updated_at timestamp,
 			primary key(room_id)
@@ -198,7 +201,7 @@ func (s *MysqlStore) CreateTableMessage() error {
 			client_id varchar(100) references client(client_id) on delete set null,
 			content varchar(500) not null,
 			created_at timestamp,
-			upated_at timestamp,
+			updated_at timestamp,
 			primary key(message_id)
 		);
 	`

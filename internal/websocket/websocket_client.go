@@ -15,7 +15,7 @@ type RoomType struct {
 	Updated_At time.Time `json:"updated_at"`
 }
 
-type RommTypeRes struct {
+type RoomTypeRes struct {
 	Room_ID        string    `json:"room_id"`
 	Name_Room      string    `json:"name_room"`
 	Created_At     time.Time `json:"created_at"`
@@ -49,13 +49,15 @@ type ClientType struct {
 }
 
 type MessageType struct {
-	Message_ID string    `json:"message_id"`
-	Room_ID    string    `json:"room_id"`
-	User_ID    string    `json:"user_id"`
-	Client_ID  string    `json:"client_id"`
-	Content    string    `json:"content"`
-	Created_At time.Time `json:"created_at"`
-	Updated_At time.Time `json:"updated_at"`
+	Message_ID    string    `json:"message_id"`
+	Room_ID       string    `json:"room_id"`
+	User_ID       string    `json:"user_id"`
+	User_Name     string    `json:"user_name"`
+	Photo_Profile string    `json:"photo_profile"`
+	Client_ID     string    `json:"client_id"`
+	Content       string    `json:"content"`
+	Created_At    time.Time `json:"created_at"`
+	Updated_At    time.Time `json:"updated_at"`
 }
 
 type LogType struct {
@@ -90,6 +92,7 @@ func (c *Client) readMessage(hub *Hub) {
 	for {
 		_, m, err := c.Conn.ReadMessage()
 		if err != nil {
+			log.Println("1. readMessage", err)
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error: %v", err)
 			}
