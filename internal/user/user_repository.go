@@ -240,7 +240,7 @@ func (r *Repository) GetUserPost(u *GetPostResType) (*GetPostResType, error) {
 
 // get ALl post
 func (r *Repository) GetAllPost(user_id string) ([]*GetPostResType, error) {
-	query := "select post.post_id as `post_id`, post.user_id as `user_id`, post.content as `content`, post.type as `type`, post.created_at as `created_at`, post.updated_at as `updated_at` from user_friend inner join post on user_friend.friend_id = post.user_id or post.user_id = ? where user_friend.user_id = ? and post.type = 'main';"
+	query := "select post.post_id as `post_id`, post.user_id as `user_id`, post.content as `content`, post.type as `type`, post.created_at as `created_at`, post.updated_at as `updated_at` from user_friend inner join post on user_friend.friend_id = post.user_id or post.user_id = ? where user_friend.user_id = ? and post.type = 'main' order by post.created_at desc;"
 
 	rows, err := r.db.Query(query, user_id, user_id)
 
@@ -292,7 +292,7 @@ func (r *Repository) GetAllPost(user_id string) ([]*GetPostResType, error) {
 
 // get ALl OWN post
 func (r *Repository) GetAllOwnPost(user_id string) ([]*GetPostResType, error) {
-	query := "select * from post where user_id = ? and type = 'main';"
+	query := "select * from post where user_id = ? and type = 'main' order by created_at desc;"
 
 	rows, err := r.db.Query(query, user_id)
 
@@ -444,7 +444,7 @@ func (r *Repository) CreateImagePost(img *Image_PostType) error {
 
 // Get all image
 func (r *Repository) GetAllImage(user_id string) ([]*Image_PostType, error) {
-	query := `select * from image_post where user_id = ?;`
+	query := `select * from image_post where user_id = ? order by created_at desc;`
 
 	rows, err := r.db.Query(query, user_id)
 	if err != nil {
@@ -492,7 +492,7 @@ func (r *Repository) CreateComment(comment *CommentType) error {
 
 // get All Comment
 func (r *Repository) GetAllComment(post_id string) ([]*GetPostResType, error) {
-	query := "select post.post_id as `post_id`, post.user_id as `user_id`, post.content as `content`, post.type as `type`, post.created_at as `created_at`, post.updated_at as `updated_at` from comment inner join post on comment.comment_post_id = post.post_id where comment.post_id = ?;"
+	query := "select post.post_id as `post_id`, post.user_id as `user_id`, post.content as `content`, post.type as `type`, post.created_at as `created_at`, post.updated_at as `updated_at` from comment inner join post on comment.comment_post_id = post.post_id where comment.post_id = ? order by post.created_at desc;"
 
 	rows, err := r.db.Query(query, post_id)
 	if err != nil {

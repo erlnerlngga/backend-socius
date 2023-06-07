@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/smtp"
 	"os"
 	"time"
 
@@ -42,21 +41,6 @@ func MakeHTTPHandleFunc(f apiFunc) http.HandlerFunc {
 			WriteJSON(w, http.StatusBadRequest, ApiError{Error: err.Error()})
 		}
 	}
-}
-
-func SendEmail(email, token string) error {
-	// set email auth
-	authEmail := smtp.PlainAuth("", os.Getenv("EMAIL"), os.Getenv("PASSWORD_EMAIL"), "smtp.gmail.com")
-
-	// compose email
-	to := []string{email}
-	msg := []byte("From: " + "<laann.en@gmail.com>" + "\r\n" + "To: " + email + "\r\n" + "Subject: Sign In Link\r\n" + "\r\n" + "http://localhost:3000/auth/" + token)
-
-	if err := smtp.SendMail("smtp.gmail.com:587", authEmail, "laann.en@gmail.com", to, msg); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 type ClaimsType struct {
@@ -137,9 +121,7 @@ func templeteEmail(user_name, token string) string {
 						
 										<tr>
 											<td style="padding: 100px;" align="center" valign="top" class="imgHero">
-												<a href="https://res.cloudinary.com/dzdlnbckj/image/upload/v1685875239/socius/rjyko45m2xe6ci9iayhz.png" style="text-decoration:none" target="_blank">
 													<img alt="" border="0" src="https://res.cloudinary.com/dzdlnbckj/image/upload/v1685875239/socius/rjyko45m2xe6ci9iayhz.png" style="width:100%;max-width:600px;height:auto;display:block;color: #f9f9f9;" width="600">
-												</a>
 											</td>
 										</tr>
 										<tr>
