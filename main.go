@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/erlnerlngga/backend-socius/db"
 	"github.com/erlnerlngga/backend-socius/internal/user"
@@ -31,6 +32,11 @@ func main() {
 	wsHandler := websocket.NewWSHandler(wsHub)
 	go wsHub.Run(context.Background())
 
-	server := router.NewApiServer(":8080", userHandler, wsHandler)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8000"
+	}
+
+	server := router.NewApiServer("0.0.0.0:"+port, userHandler, wsHandler)
 	server.Run()
 }
