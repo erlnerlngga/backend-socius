@@ -3,23 +3,13 @@ package util
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/joho/godotenv"
 	"gopkg.in/gomail.v2"
 )
-
-func init() {
-	err := godotenv.Load(".env")
-
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-}
 
 var JwtKey = []byte(os.Getenv("JWT_SECRET"))
 

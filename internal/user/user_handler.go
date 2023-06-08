@@ -20,9 +20,14 @@ func NewUserHandler(r *Repository) *Handler {
 	}
 }
 
+func (h *Handler) Welcome(w http.ResponseWriter, r *http.Request) error {
+	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "Welcome to Socius"})
+}
+
 func (h *Handler) CheckEmail(w http.ResponseWriter, r *http.Request) error {
 	acc := new(SignInType)
 	if err := json.NewDecoder(r.Body).Decode(acc); err != nil {
+		log.Println("1. CheckEmail", err)
 		return err
 	}
 
@@ -30,6 +35,7 @@ func (h *Handler) CheckEmail(w http.ResponseWriter, r *http.Request) error {
 
 	email, err := h.Repository.CheckEmail(acc.Email)
 	if err != nil {
+		log.Println("2. CheckEmail", err)
 		return err
 	}
 
@@ -40,6 +46,7 @@ func (h *Handler) SignUp(w http.ResponseWriter, r *http.Request) error {
 	acc := new(UserType)
 
 	if err := json.NewDecoder(r.Body).Decode(acc); err != nil {
+		log.Println("1. SignUp", err)
 		return err
 	}
 
@@ -47,15 +54,18 @@ func (h *Handler) SignUp(w http.ResponseWriter, r *http.Request) error {
 
 	newAcc, err := h.Repository.SignUp(acc)
 	if err != nil {
+		log.Println("2. SignUp", err)
 		return err
 	}
 
 	tokenStr, err := util.CreateJWT(newAcc.User_ID)
 	if err != nil {
+		log.Println("3. SignUp", err)
 		return err
 	}
 
 	if err := util.SendMAIL(newAcc.Email, newAcc.User_Name, tokenStr); err != nil {
+		log.Println("4. SignUp", err)
 		return err
 	}
 
@@ -66,6 +76,7 @@ func (h *Handler) SignIn(w http.ResponseWriter, r *http.Request) error {
 	email := new(SignInType)
 
 	if err := json.NewDecoder(r.Body).Decode(email); err != nil {
+		log.Println("1. SignIn", err)
 		return err
 	}
 
@@ -73,16 +84,19 @@ func (h *Handler) SignIn(w http.ResponseWriter, r *http.Request) error {
 
 	account, err := h.Repository.CheckEmail(email.Email)
 	if err != nil {
+		log.Println("2. SignIn", err)
 		return err
 	}
 
 	// create token
 	tokenStr, err := util.CreateJWT(account.User_ID)
 	if err != nil {
+		log.Println("3. SignIn", err)
 		return err
 	}
 
 	if err := util.SendMAIL(account.Email, account.User_Name, tokenStr); err != nil {
+		log.Println("4. SignIn", err)
 		return err
 	}
 
@@ -100,9 +114,10 @@ func (h *Handler) VerifySignIn(w http.ResponseWriter, r *http.Request) error {
 
 	if err != nil {
 		if err == jwt.ErrSignatureInvalid {
+			log.Println("1. VerifySignIn", err)
 			return util.WriteJSON(w, http.StatusUnauthorized, util.ApiError{Error: "signature invalid"})
 		}
-
+		log.Println("2. VerifySignIn", err)
 		return util.WriteJSON(w, http.StatusUnauthorized, util.ApiError{Error: err.Error()})
 	}
 
@@ -112,6 +127,7 @@ func (h *Handler) VerifySignIn(w http.ResponseWriter, r *http.Request) error {
 
 	user, err := h.Repository.GetUser(claims.User_ID)
 	if err != nil {
+		log.Println("3. VerifySignIn", err)
 		return err
 	}
 
@@ -135,9 +151,10 @@ func (h *Handler) JustCheck(w http.ResponseWriter, r *http.Request) error {
 
 	if err != nil {
 		if err == jwt.ErrSignatureInvalid {
+			log.Println("1. JustCheck", err)
 			return util.WriteJSON(w, http.StatusUnauthorized, util.ApiError{Error: "signature invalid"})
 		}
-
+		log.Println("2. JustCheck", err)
 		return util.WriteJSON(w, http.StatusUnauthorized, util.ApiError{Error: err.Error()})
 	}
 
@@ -147,6 +164,7 @@ func (h *Handler) JustCheck(w http.ResponseWriter, r *http.Request) error {
 
 	user, err := h.Repository.GetUser(claims.User_ID)
 	if err != nil {
+		log.Println("3. JustCheck", err)
 		return err
 	}
 
@@ -164,6 +182,7 @@ func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) error {
 
 	user, err := h.Repository.GetUser(userID)
 	if err != nil {
+		log.Println("1. GetUserByID", err)
 		return err
 	}
 
@@ -174,6 +193,7 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) error {
 	userUp := new(UserType)
 
 	if err := json.NewDecoder(r.Body).Decode(userUp); err != nil {
+		log.Println("1. UpdateUser", err)
 		return err
 	}
 
@@ -183,6 +203,7 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) error {
 
 	err := h.Repository.UpdateUser(userUp)
 	if err != nil {
+		log.Println("2. UpdateUser", err)
 		return err
 	}
 
@@ -194,6 +215,7 @@ func (h *Handler) GetUserbyEmail(w http.ResponseWriter, r *http.Request) error {
 
 	user, err := h.Repository.GetUserbyEmail(email)
 	if err != nil {
+		log.Println("1. GetUserbyEmail", err)
 		return err
 	}
 
@@ -204,6 +226,7 @@ func (h *Handler) AddNewFriend(w http.ResponseWriter, r *http.Request) error {
 	newFr := new(User_FriendType)
 
 	if err := json.NewDecoder(r.Body).Decode(newFr); err != nil {
+		log.Println("1. AddNewFriend", err)
 		return err
 	}
 
@@ -211,6 +234,7 @@ func (h *Handler) AddNewFriend(w http.ResponseWriter, r *http.Request) error {
 
 	err := h.Repository.AddFriend(newFr)
 	if err != nil {
+		log.Println("2. AddNewFriend", err)
 		return err
 	}
 
@@ -223,18 +247,16 @@ func (h *Handler) RemoveFriend(w http.ResponseWriter, r *http.Request) error {
 	friendID := chi.URLParam(r, "friendID")
 
 	err := h.Repository.RemoveFriend(userFriendId)
-
 	if err != nil {
+		log.Println("1. RemoveFriend", err)
 		return err
 	}
 
 	err = h.Repository.RemoveFriendByUserID(friendID, userID)
-
 	if err != nil {
+		log.Println("2. RemoveFriend", err)
 		return err
 	}
-
-	log.Println("works")
 
 	return util.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
@@ -244,6 +266,7 @@ func (h *Handler) GetAllFriend(w http.ResponseWriter, r *http.Request) error {
 
 	friends, err := h.Repository.GetAllFriend(userID)
 	if err != nil {
+		log.Println("1. GetAllFriend", err)
 		return err
 	}
 
@@ -254,6 +277,7 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) error {
 	newPost := new(PostReqType)
 
 	if err := json.NewDecoder(r.Body).Decode(newPost); err != nil {
+		log.Println("1. CreatePost", err)
 		return err
 	}
 
@@ -267,6 +291,7 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) error {
 
 	post_ID, err := h.Repository.CreatePost(p)
 	if err != nil {
+		log.Println("2. CreatePost", err)
 		return err
 	}
 
@@ -281,6 +306,7 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) error {
 			err := h.Repository.CreateImagePost(im)
 
 			if err != nil {
+				log.Println("3. CreatePost", err)
 				return err
 			}
 		}
@@ -295,17 +321,20 @@ func (h *Handler) GetAllPost(w http.ResponseWriter, r *http.Request) error {
 
 	number, err := h.Repository.CheckFriend(userID)
 	if err != nil {
+		log.Println("1. GetAllPost", err)
 		return err
 	}
 
 	if number > 0 {
 		post, err = h.Repository.GetAllPost(userID)
 		if err != nil {
+			log.Println("2. GetAllPost", err)
 			return err
 		}
 	} else {
 		post, err = h.Repository.GetAllOwnPost(userID)
 		if err != nil {
+			log.Println("3. GetAllPost", err)
 			return err
 		}
 	}
@@ -318,6 +347,7 @@ func (h *Handler) GetAllOwnPost(w http.ResponseWriter, r *http.Request) error {
 
 	post, err := h.Repository.GetAllOwnPost(userID)
 	if err != nil {
+		log.Println("1. GetAllOwnPost", err)
 		return err
 	}
 
@@ -329,6 +359,7 @@ func (h *Handler) GetPost(w http.ResponseWriter, r *http.Request) error {
 
 	post, err := h.Repository.GetPost(postID)
 	if err != nil {
+		log.Println("1. GetPost", err)
 		return err
 	}
 
@@ -340,6 +371,7 @@ func (h *Handler) GetAllImage(w http.ResponseWriter, r *http.Request) error {
 
 	images, err := h.Repository.GetAllImage(userID)
 	if err != nil {
+		log.Println("1. GetAllImage", err)
 		return err
 	}
 
@@ -350,6 +382,7 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) error {
 	newPost := new(CommentReqType)
 
 	if err := json.NewDecoder(r.Body).Decode(newPost); err != nil {
+		log.Println("1. CreateComment", err)
 		return err
 	}
 
@@ -363,6 +396,7 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) error {
 
 	post_ID, err := h.Repository.CreatePost(p)
 	if err != nil {
+		log.Println("2. CreateComment", err)
 		return err
 	}
 
@@ -377,6 +411,7 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) error {
 			err := h.Repository.CreateImagePost(im)
 
 			if err != nil {
+				log.Println("3. CreateComment", err)
 				return err
 			}
 		}
@@ -390,6 +425,7 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) error {
 	// insert comment
 	err = h.Repository.CreateComment(commen)
 	if err != nil {
+		log.Println("4. CreateComment", err)
 		return err
 	}
 
@@ -401,6 +437,7 @@ func (h *Handler) GetAllComment(w http.ResponseWriter, r *http.Request) error {
 
 	comment, err := h.Repository.GetAllComment(postID)
 	if err != nil {
+		log.Println("1. GetAllComment", err)
 		return err
 	}
 
@@ -411,6 +448,7 @@ func (h *Handler) CreateNotification(w http.ResponseWriter, r *http.Request) err
 	not := new(NotificationType)
 
 	if err := json.NewDecoder(r.Body).Decode(not); err != nil {
+		log.Println("1. CreateNotification", err)
 		return err
 	}
 
@@ -418,6 +456,7 @@ func (h *Handler) CreateNotification(w http.ResponseWriter, r *http.Request) err
 
 	err := h.Repository.CreateNotification(not)
 	if err != nil {
+		log.Println("2. CreateNotification", err)
 		return err
 	}
 
@@ -428,6 +467,7 @@ func (h *Handler) UpdateAddFriendNotification(w http.ResponseWriter, r *http.Req
 	newNotif := new(UpdateNotifType)
 
 	if err := json.NewDecoder(r.Body).Decode(newNotif); err != nil {
+		log.Println("1. UpdateAddFriendNotification", err)
 		return err
 	}
 
@@ -435,6 +475,7 @@ func (h *Handler) UpdateAddFriendNotification(w http.ResponseWriter, r *http.Req
 
 	err := h.Repository.UpdateNotif(newNotif)
 	if err != nil {
+		log.Println("2. UpdateAddFriendNotification", err)
 		return err
 	}
 
@@ -446,6 +487,7 @@ func (h *Handler) UpdateNotificationRead(w http.ResponseWriter, r *http.Request)
 
 	err := h.Repository.UpdatedNotifRead(userID)
 	if err != nil {
+		log.Println("1. UpdateNotificationRead", err)
 		return err
 	}
 
@@ -457,6 +499,7 @@ func (h *Handler) GetCountNotification(w http.ResponseWriter, r *http.Request) e
 
 	num, err := h.Repository.GetCountNotif(userID)
 	if err != nil {
+		log.Println("1. GetCountNotification", err)
 		return err
 	}
 
@@ -468,6 +511,7 @@ func (h *Handler) GetAllNotification(w http.ResponseWriter, r *http.Request) err
 
 	notif, err := h.Repository.GetAllNotif(userID)
 	if err != nil {
+		log.Println("1. GetAllNotification", err)
 		return err
 	}
 

@@ -40,6 +40,7 @@ func (s *APIServer) Run() {
 		r.Get("/ws/joinRoom/{roomID}/{userID}", s.wsHandler.JoinRoom)
 	})
 
+	router.Get("/", util.MakeHTTPHandleFunc(s.userHandler.Welcome))
 	router.Post("/signup", util.MakeHTTPHandleFunc(s.userHandler.SignUp))
 	router.Post("/signin", util.MakeHTTPHandleFunc(s.userHandler.SignIn))
 	router.Get("/auth/{token}", util.MakeHTTPHandleFunc(s.userHandler.VerifySignIn))

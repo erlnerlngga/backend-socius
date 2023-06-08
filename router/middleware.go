@@ -9,16 +9,7 @@ import (
 	"github.com/erlnerlngga/backend-socius/util"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/joho/godotenv"
 )
-
-func init() {
-	err := godotenv.Load(".env")
-
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-}
 
 // middleware to handle jwt verification
 func WithJWTAuth(next http.Handler) http.Handler {
