@@ -30,7 +30,7 @@ func (s *APIServer) Run() {
 	router := chi.NewRouter()
 
 	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000"},
+		AllowedOrigins:   []string{"https://socius-jade.vercel.app", "https://socius-laannen-gmailcom.vercel.app", "https://socius-5ym9o8can-laannen-gmailcom.vercel.app", "https://socius-git-main-laannen-gmailcom.vercel.app"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
